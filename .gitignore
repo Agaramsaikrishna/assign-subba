@@ -43,7 +43,7 @@ secrets.json
 credentials.json
 
 # ── Database ──────────────────────────────────────────────────────────────────
-*.db
+
 *.sqlite
 *.sqlite3
 
