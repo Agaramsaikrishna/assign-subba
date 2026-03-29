@@ -9,10 +9,10 @@ A full-stack backend system to **track, manage, and optimize** your organization
 - [Features](#features)
 - [Tech Stack](#tech-stack)
 - [Project Structure](#project-structure)
-- [Quick Start](#quick-start)
+- [How to Run](#how-to-run)
 - [Environment Variables](#environment-variables)
-- [API Reference](#api-reference)
 - [Frontend](#frontend)
+- [API Reference](#api-reference)
 - [AI Assistant](#ai-assistant)
 - [Automated Reminders](#automated-reminders)
 - [Database Schema](#database-schema)
@@ -87,68 +87,117 @@ assign-subbu-anna/
 
 ---
 
-## Quick Start
+## How to Run
 
-### 1. Prerequisites
+### Prerequisites
 
-- Python 3.10+
-- A free [Groq API key](https://console.groq.com) (or OpenAI API key)
+- Python **3.10+**
+- A free **Groq API key** — get one at [console.groq.com](https://console.groq.com) (free, no credit card)
 
-### 2. Clone and set up
+---
+
+### Step 1 — Clone the repository
 
 ```bash
 git clone <your-repo-url>
 cd assign-subbu-anna
 ```
 
-### 3. Create virtual environment
+---
 
+### Step 2 — Create and activate a virtual environment
+
+**Windows:**
+```cmd
+python -m venv .venv
+.venv\Scripts\activate
+```
+
+**macOS / Linux:**
 ```bash
 python -m venv .venv
-
-# Windows
-.venv\Scripts\activate
-
-# macOS / Linux
 source .venv/bin/activate
 ```
 
-### 4. Install dependencies
+You should see `(.venv)` in your terminal prompt after activation.
+
+---
+
+### Step 3 — Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 5. Configure environment
+This installs FastAPI, SQLAlchemy, LangChain, Groq, APScheduler, and all other packages.
 
-Create a `.env` file in the project root (or edit the existing one):
+---
+
+### Step 4 — Create the `.env` file
+
+Create a file named `.env` in the project root:
 
 ```env
-GROQ_API_KEY=gsk_your_groq_key_here
-SECRET_KEY=your-secret-jwt-key-change-this-in-production
+GROQ_API_KEY=gsk_your_groq_api_key_here
+SECRET_KEY=any-long-random-string-for-jwt
 
-# LLM Configuration
-MODEL_PROVIDER=groq                    # groq (default) | openai
-LLM_MODEL=llama-3.3-70b-versatile     # or gpt-4o for OpenAI
-# OPENAI_API_KEY=sk-...               # only needed if MODEL_PROVIDER=openai
+# LLM settings (defaults below work out of the box with Groq)
+MODEL_PROVIDER=groq
+LLM_MODEL=llama-3.3-70b-versatile
+
+# Uncomment below if you want to use OpenAI instead
+# MODEL_PROVIDER=openai
+# LLM_MODEL=gpt-4o
+# OPENAI_API_KEY=sk-your-openai-key
 ```
 
-### 6. Run the server
+> **Tip:** Replace `gsk_your_groq_api_key_here` with your actual Groq key. The database (`subscriptions.db`) is created automatically on first run — no setup needed.
+
+---
+
+### Step 5 — Start the server
 
 ```bash
 uvicorn app:app --reload
 ```
 
-Server starts at: `http://localhost:8000`
+You should see output like:
 
-### 7. Access the app
+```
+INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+INFO:     Started reloader process
+INFO:     Application startup complete.
+[Scheduler] Started. Jobs: 7-day reminders, 30-day reminders, overdue alerts.
+```
 
-| URL | Description |
+---
+
+### Step 6 — Open the Frontend
+
+Open your browser and go to:
+
+```
+http://localhost:8000/app
+```
+
+That's it! You'll see the full dashboard UI.
+
+| URL | What it is |
 |---|---|
-| `http://localhost:8000/app` | Frontend dashboard (SPA) |
-| `http://localhost:8000/docs` | Swagger UI — interactive API explorer |
-| `http://localhost:8000/redoc` | ReDoc API documentation |
-| `http://localhost:8000/` | API info JSON |
+| **`http://localhost:8000/app`** | **Frontend SPA — start here** |
+| `http://localhost:8000/docs` | Swagger UI (interactive API explorer) |
+| `http://localhost:8000/redoc` | ReDoc API docs |
+| `http://localhost:8000/` | API health/info JSON |
+
+---
+
+### First Time Using the App
+
+1. Go to `http://localhost:8000/app`
+2. Click **Register** tab → enter any email + password → click **Create Account**
+3. You're in! The dashboard loads automatically
+4. Go to **Subscriptions** → **Add New** to add your first tool
+5. Head to **AI Chat** and ask: *"What is my total annual spend?"*
 
 ---
 
@@ -293,25 +342,51 @@ curl -X POST http://localhost:8000/auth/register \
 
 ## Frontend
 
-The frontend is a single-page application served directly by FastAPI.
+The frontend is a **single-page application (SPA)** built with Vanilla JS + Tailwind CSS CDN + Chart.js, served directly by FastAPI — no separate build step or Node.js required.
 
-**URL:** `http://localhost:8000/app`
+### How to Open
+
+```
+http://localhost:8000/app
+```
+
+Just start the backend server (Step 5 above) and open that URL in your browser.
+
+### Design
+
+- Dark gradient sidebar (`#0f172a → #1e1b4b`) with glowing active nav items
+- Gradient KPI cards (indigo, emerald, amber, rose, blue, violet)
+- Frosted-glass sticky topbar
+- Smooth hover animations on cards and buttons
+- Color-coded renewal urgency (red = overdue/≤7 days, amber = ≤30 days, gray = safe)
+- Toast notifications for all actions (top-right)
+- Empty states with icons when no data
+- Loading spinners on all async operations
 
 ### Views
 
-| View | Description |
+| View | What you can do |
 |---|---|
-| **Dashboard** | KPI cards (annual cost, active subs, overdue, renewing this week), category donut chart (Chart.js), top-5 expensive table, 7-day renewal list |
-| **Subscriptions** | Filter bar (search/status/category/billing), sortable table, add/edit modal, delete confirm — full CRUD |
-| **Analytics** | Monthly spend trend (line chart), renewal density (bar chart), optimization tips, spend summary cards |
-| **AI Chat** | Quick prompt chips, live chat interface with typing indicator, connected to LangChain agent backend |
+| **Dashboard** | See 4 KPI cards (annual spend, active tools, renewing soon, overdue), category donut chart, top-5 expense progress bars, 7-day renewal list, overdue list, alert banners |
+| **Subscriptions** | Search by name, filter by status/category/billing/sort, paginated table, add new subscription, edit any subscription, delete with confirmation |
+| **Analytics** | 4 spend KPIs, monthly spend trend (line chart), renewal density by month (bar chart), full cost optimization tips from AI analysis |
+| **AI Chat** | Quick prompt chips, live chat with typing indicator, markdown formatting in bot replies, persistent history, clear conversation |
 
 ### Auth Flow
 
-1. Open `http://localhost:8000/app`
-2. Register or login — JWT token saved to `localStorage`
-3. All API calls automatically include `Authorization: Bearer <token>`
-4. Logout clears the token and returns to auth screen
+1. Open `http://localhost:8000/app` — auth screen loads automatically
+2. Click **Register** → enter email + password → **Create Account**
+3. JWT token is saved to `localStorage` and all API calls use it automatically
+4. On return visits, you're logged in automatically if the token is still valid
+5. Click **Sign Out** in the sidebar to log out
+
+### Tech used (no build required)
+
+- **Tailwind CSS** — loaded from CDN, utility-first styling
+- **Chart.js 4.4** — donut, line, and bar charts
+- **Font Awesome 6.5** — icons throughout the UI
+- **Google Fonts (Inter)** — typography
+- **Vanilla JS** — zero framework dependencies
 
 ---
 

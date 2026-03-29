@@ -833,24 +833,28 @@ function updateTimestamp() {
 async function loadDashboard() {
   try {
     const d = await api('/dashboard/');
-    // KPI cards
+
+    // KPI cards — use correct field names from DashboardOut schema
+    const dailyCost = d.total_annual_cost / 365;
     $('kpi-annual').textContent = fmt$(d.total_annual_cost);
-    $('kpi-daily').textContent = `${fmt$(d.daily_cost)}/day`;
-    $('kpi-active').textContent = d.active;
+    $('kpi-daily').textContent = `${fmt$(dailyCost)}/day`;
+    $('kpi-active').textContent = d.active_subscriptions;
     $('kpi-total').textContent = `${d.total_subscriptions} total`;
-    $('kpi-renewing').textContent = d.upcoming_30_days_count;
-    $('kpi-overdue').textContent = d.overdue_count;
+    $('kpi-renewing').textContent = d.upcoming_renewals_30_days.length;
+    $('kpi-overdue').textContent = d.overdue_subscriptions.length;
 
     // Alert banners
     const alertArea = $('alert-area');
     alertArea.innerHTML = '';
-    if (d.overdue_count > 0) alertArea.innerHTML += `<div class="alert-banner alert-danger"><i class="fas fa-exclamation-circle mt-0.5"></i><span><strong>${d.overdue_count} overdue</strong> subscription${d.overdue_count > 1 ? 's' : ''} need immediate attention — renewal date has passed.</span></div>`;
-    if (d.upcoming_7_days?.length > 0) alertArea.innerHTML += `<div class="alert-banner alert-warning"><i class="fas fa-clock mt-0.5"></i><span><strong>${d.upcoming_7_days.length} subscription${d.upcoming_7_days.length > 1 ? 's' : ''}</strong> renewing within 7 days. Total: ${fmt$(d.upcoming_7_days.reduce((a, s) => a + s.cost, 0))}</span></div>`;
+    const overdueCount = d.overdue_subscriptions.length;
+    const upcoming7 = d.upcoming_renewals_7_days;
+    if (overdueCount > 0) alertArea.innerHTML += `<div class="alert-banner alert-danger"><i class="fas fa-exclamation-circle mt-0.5"></i><span><strong>${overdueCount} overdue</strong> subscription${overdueCount > 1 ? 's' : ''} need immediate attention — renewal date has passed.</span></div>`;
+    if (upcoming7.length > 0) alertArea.innerHTML += `<div class="alert-banner alert-warning"><i class="fas fa-clock mt-0.5"></i><span><strong>${upcoming7.length} subscription${upcoming7.length > 1 ? 's' : ''}</strong> renewing within 7 days. Total: ${fmt$(upcoming7.reduce((a, s) => a + s.cost, 0))}</span></div>`;
 
-    // Category donut chart
-    const cats = d.spend_by_category || {};
-    const catLabels = Object.keys(cats);
-    const catValues = Object.values(cats);
+    // Category donut chart — spend_by_category is List[{category, total_cost, ...}]
+    const catList = d.spend_by_category || [];
+    const catLabels = catList.map(c => c.category);
+    const catValues = catList.map(c => c.total_cost);
     const totalCat = catValues.reduce((a, b) => a + b, 0);
     if (chartCategory) chartCategory.destroy();
     if (catLabels.length > 0) {
@@ -861,15 +865,17 @@ async function loadDashboard() {
       });
       $('donut-center').classList.remove('hidden');
       $('donut-total').textContent = fmt$(totalCat);
-      // Legend
       $('category-legend').innerHTML = catLabels.map((l, i) => `
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2"><span style="width:10px;height:10px;border-radius:3px;background:${PALETTE[i]};display:inline-block;flex-shrink:0;"></span><span class="text-xs text-slate-600">${l}</span></div>
           <span class="text-xs font-semibold text-slate-700">${fmt$(catValues[i])}</span>
         </div>`).join('');
+    } else {
+      $('donut-center').classList.add('hidden');
+      $('category-legend').innerHTML = '<p class="text-xs text-slate-400 text-center py-2">No data yet</p>';
     }
 
-    // Top 5 expensive
+    // Top 5 expensive — field is top_5_expensive, each item is SubscriptionOut with tool_name
     const top5 = d.top_5_expensive || [];
     const maxCost = top5.length ? top5[0].cost : 1;
     $('top5-list').innerHTML = top5.length ? top5.map((s, i) => `
@@ -883,21 +889,22 @@ async function loadDashboard() {
           <span class="text-sm font-bold text-slate-800">${fmt$(s.cost)}</span>
         </div>
         <div class="progress-bar"><div class="progress-fill" style="width:${(s.cost/maxCost*100).toFixed(1)}%;background:${PALETTE[i]};"></div></div>
-      </div>`).join('') : '<div class="empty-state"><div class="icon"><i class="fas fa-list"></i></div><h3>No subscriptions yet</h3></div>';
+      </div>`).join('') : '<div class="empty-state"><div class="icon"><i class="fas fa-list"></i></div><h3>No subscriptions yet</h3><p>Add a subscription to see insights</p></div>';
 
-    // Upcoming 7 days
-    $('7day-badge').textContent = d.upcoming_7_days?.length || 0;
-    $('upcoming-list').innerHTML = d.upcoming_7_days?.length ? d.upcoming_7_days.map(s => `
+    // Upcoming 7 days — field is upcoming_renewals_7_days, each item has tool_name
+    $('7day-badge').textContent = upcoming7.length;
+    $('upcoming-list').innerHTML = upcoming7.length ? upcoming7.map(s => `
       <div class="stat-row">
-        <div><p class="text-sm font-semibold text-slate-700">${s.tool}</p><p class="text-xs text-slate-400">${fmtDate(s.renewal_date)}</p></div>
-        <div class="text-right"><p class="text-sm font-bold text-amber-600">${fmt$(s.cost)}</p></div>
+        <div><p class="text-sm font-semibold text-slate-700">${s.tool_name}</p><p class="text-xs text-slate-400">${fmtDate(s.renewal_date)}</p></div>
+        <div class="text-right"><p class="text-sm font-bold text-amber-600">${fmt$(s.cost)}</p><p class="text-xs text-slate-400">${s.days_until_renewal}d left</p></div>
       </div>`).join('') : '<div class="empty-state"><div class="icon"><i class="fas fa-calendar-check"></i></div><h3>All clear!</h3><p>No renewals this week</p></div>';
 
-    // Overdue
-    $('overdue-badge').textContent = d.overdue_count || 0;
-    $('overdue-list').innerHTML = d.overdue_tools?.length ? d.overdue_tools.map(s => `
+    // Overdue — field is overdue_subscriptions, each item has tool_name + days_overdue
+    const overdueList = d.overdue_subscriptions || [];
+    $('overdue-badge').textContent = overdueList.length;
+    $('overdue-list').innerHTML = overdueList.length ? overdueList.map(s => `
       <div class="stat-row">
-        <div><p class="text-sm font-semibold text-slate-700">${s.tool}</p><p class="text-xs text-red-400"><i class="fas fa-exclamation-circle"></i> Was due ${fmtDate(s.renewal_date)}</p></div>
+        <div><p class="text-sm font-semibold text-slate-700">${s.tool_name}</p><p class="text-xs text-red-400"><i class="fas fa-exclamation-circle"></i> ${s.days_overdue}d overdue — was due ${fmtDate(s.renewal_date)}</p></div>
         <span class="badge badge-cancelled">Overdue</span>
       </div>`).join('') : '<div class="empty-state"><div class="icon"><i class="fas fa-shield-check"></i></div><h3>No overdue!</h3><p>All subscriptions are current</p></div>';
 
@@ -1111,10 +1118,12 @@ async function loadAnalytics() {
 async function loadChat() {
   if (!chatInitialized) {
     chatInitialized = true;
-    // Load quick prompts
+    // Load quick prompts — each item is {label, prompt, description}
     try {
       const prompts = await api('/chat/prompts');
-      $('quick-prompts').innerHTML = (prompts || []).map(p => `<button class="prompt-chip" onclick="usePrompt(this)">${p}</button>`).join('');
+      $('quick-prompts').innerHTML = (prompts || []).map(p =>
+        `<button class="prompt-chip" onclick="usePrompt(${JSON.stringify(p.prompt)})" title="${escHtml(p.description)}">${escHtml(p.label)}</button>`
+      ).join('');
     } catch {}
     // Load history
     try {
@@ -1128,8 +1137,8 @@ async function loadChat() {
   }
 }
 
-function usePrompt(btn) {
-  $('chat-input').value = btn.textContent;
+function usePrompt(prompt) {
+  $('chat-input').value = prompt;
   $('chat-input').focus();
 }
 
