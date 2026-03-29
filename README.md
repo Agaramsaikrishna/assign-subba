@@ -191,8 +191,29 @@ That's it! You'll see the full dashboard UI.
 
 ---
 
+### Test Credentials (pre-seeded data)
+
+A test account with 10 sample subscriptions is already loaded in the database:
+
+| Field | Value |
+|---|---|
+| **Email** | `test@gmail.com` |
+| **Password** | `test123@` |
+
+Pre-seeded subscriptions: GitHub, Slack, Figma, Notion, AWS, Datadog, Zoom, 1Password, Jira, Sentry — covering DevOps, Communication, Design, Productivity, Analytics, and Security categories.
+
+> **Note:** Jira is overdue (-5 days) and AWS + Figma are renewing within 7 days — so all alert banners will fire on the dashboard.
+
+---
+
 ### First Time Using the App
 
+**Option A — Use the test account (instant demo):**
+1. Go to `http://localhost:8000/app`
+2. Click **Login** tab → enter `test@gmail.com` / `test123@` → click **Sign In**
+3. You're in! Dashboard shows real data immediately
+
+**Option B — Create your own account:**
 1. Go to `http://localhost:8000/app`
 2. Click **Register** tab → enter any email + password → click **Create Account**
 3. You're in! The dashboard loads automatically
